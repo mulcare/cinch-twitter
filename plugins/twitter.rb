@@ -16,10 +16,8 @@ class Cinch::Twitter
     end
   end
 
-  def grab_tweet(tweetid)
-    long_tweet = @client.status(tweetid, tweet_mode: 'extended')
-    @tweet = long_tweet.attrs[:full_text]
-    @user = long_tweet.attrs[:user][:screen_name]
+  def grab_tweet_by_tweetid(tweetid)
+    tweet = @client.status(tweetid, tweet_mode: 'extended').to_hash.slice(:full_text, :user, :created_at)
   end
 
   match /tw (.+)/
