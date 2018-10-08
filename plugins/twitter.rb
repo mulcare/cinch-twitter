@@ -54,6 +54,7 @@ class Cinch::Twitter
   include Cinch::Plugin
  
   listen_to :connect, :method => :setup
+  listen_to :tweetstream, :method => :stream
 
   def setup(*)
     @client = Twitter::REST::Client.new do |c|
