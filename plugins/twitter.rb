@@ -20,31 +20,41 @@ class Cinch::TwitterStreamer
     end
 
     while true
-      @streamer.filter(follow: config[:ids_to_follow]) do |tweet|
-        # Twitter's Streaming API works differently than its REST API, so we
-        # can't simply use "tweet_mode: 'extended'" and its ":full_text" attr
-        # to get the full text of tweets with more than 140 characters. We must
-        # instead test for the ":extended_tweet" attr, which is only present
-        # in 140+ char tweets.
-        if tweet.attrs[:extended_tweet]
-          text = tweet.attrs[:extended_tweet][:full_text]
-        else
-          text = tweet.attrs[:text]
+      @streamer.filter(follow: config[:ids_to_follow].join(",")) do |tweet|
+        # By default, the .filter function in Twitter's Streaming API includes
+        # replies and retweets. Default behvior for this streamer is to only
+        # display original tweets from a user, so we have to check each tweet
+        # against the userid attribute and ensure it is from the intended user.
+        if config[:ids_to_follow].include?(tweet.attrs[:user][:id_str])
+
+          # Twitter's Streaming API works differently than its REST API, so we
+          # can't simply use "tweet_mode: 'extended'" and its ":full_text" attr
+          # to get the full text of tweets with more than 140 characters. We 
+          # must instead test for the ":extended_tweet" attr, which is only 
+          # present in 140+ char tweets.
+          if tweet.attrs[:extended_tweet]
+            text = tweet.attrs[:extended_tweet][:full_text]
+          else
+            text = tweet.attrs[:text]
+          end
+
+          date = DateTime.strptime(tweet.attrs[:created_at], "%a %b %d %H:%M:%S %z %Y").new_offset("-04:00").strftime("%a %b %d %Y %I:%M%P")
+          payload = [config[:channel], date, tweet.user.screen_name, text]
+  
+          # Fire off a :tweetstream event with the array containing the payload.
+          # Using Cinch's listen_to method, we these events can be handled
+          # elsewhere, including across plugins.
+          # 
+          # Ex:
+          #     listen_to :tweetstream, :method => :do_something_with_payload
+          #     def do_something_with_payload(m, payload)
+          #       payload #=> ["#channel", "ex. date", "ex. user", "ex. text"]
+          #     end
+
+          @bot.handlers.dispatch(:tweetstream, nil, payload)
+
         end
 
-        date = DateTime.strptime(tweet.attrs[:created_at], "%a %b %d %H:%M:%S %z %Y").new_offset("-04:00").strftime("%a %b %d %Y %I:%M%P")
-        payload = [config[:channel], date, tweet.user.screen_name, text]
-
-        # Fire off a :tweetstream event with the array containing the payload.
-        # Using Cinch's listen_to method, we can handle these events elsewhere,
-        # including across plugins.
-        # 
-        # Ex:
-        #     listen_to :tweetstream, :method => :do_something_with_payload
-        #     def do_something_with_payload(m, payload)
-        #       payload #=> ["#channel", "ex. date", "ex. user", "ex. text"]
-        #     end 
-        @bot.handlers.dispatch(:tweetstream, nil, payload)
       end
     end
   end
