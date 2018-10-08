@@ -1,6 +1,7 @@
 require 'net/http'
 require 'json'
 require 'twitter'
+require 'date'
 
 class Cinch::Twitter
   include Cinch::Plugin
@@ -17,13 +18,19 @@ class Cinch::Twitter
   end
 
   def grab_tweet_by_tweetid(tweetid)
-    tweet = @client.status(tweetid, tweet_mode: 'extended').to_hash.slice(:full_text, :user, :created_at)
+    tweet = @client.status(tweetid, tweet_mode: 'extended')
+    tweet = tweet.to_hash.slice(:full_text, :user, :created_at)
+    @tweet = {
+      name: tweet[:user][:screen_name],
+      date: DateTime.strptime(tweet[:created_at], "%a %b %d %H:%M:%S %z %Y").new_offset("-04:00").strftime("%a %b %d %Y %I:%M%P"),
+      text: tweet[:full_text]
+    }
   end
 
   match /tw (.+)/
   def execute(m, query)
-    grab_tweet(query)
-    m.reply "#{@user}: #{@tweet}"
+    grab_tweet_by_tweetid(query)
+    m.reply "🐦 #{@tweet[:date]} #{Format(:bold, @tweet[:name])}: #{@tweet[:text]}"
   end
 
 end
